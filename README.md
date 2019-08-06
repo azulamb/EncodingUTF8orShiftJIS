@@ -1,0 +1,1 @@
+# EncodingUTF8orShiftJIS
