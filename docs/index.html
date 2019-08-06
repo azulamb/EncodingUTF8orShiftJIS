@@ -9,6 +9,7 @@ body { margin: 0; height: 100%; }
 body > * { width: 100%; height: 50%; box-sizing: border-box; overflow: auto; }
 #drop { border: 10px solid black; }
 #text { display: block; margin: 0; }
+#drop:empty::after { content: 'Drop text file here!'; }
 	</style>
 	<script>
 class LoadTextFile
@@ -105,7 +106,7 @@ document.addEventListener( 'DOMContentLoaded', () =>
 	</script>
 </head>
 <body>
-	<div id="drop">Drop text file here!</div>
+	<div id="drop"></div>
 	<pre id="text"></pre>
 </body>
 </html>
