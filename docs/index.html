@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="ja" style="font-size:20px;">
+<head>
+	<meta charset="utf-8">
+	<title>Encoding</title>
+	<style>
+html { height: 100%; }
+body { margin: 0; height: 100%; }
+body > * { width: 100%; height: 50%; box-sizing: border-box; overflow: auto; }
+#drop { border: 10px solid black; }
+#text { display: block; margin: 0; }
+	</style>
+	<script>
+class LoadTextFile
+{
+	constructor( config )
+	{
+		this.text = config.text;
+		this.init( config.drop );
+	}
+
+	init( element )
+	{
+		this.drop = element;
+		element.addEventListener( 'dragover', ( event ) =>
+		{
+			event.stopPropagation();
+			event.preventDefault();
+			if ( event.dataTransfer ) { event.dataTransfer.dropEffect = 'copy'; }
+		}, false );
+		element.addEventListener( 'drop', ( event ) =>
+		{
+			event.stopPropagation();
+			event.preventDefault();
+			const files = event.dataTransfer.files;
+			if ( files.length < 1 ) { return; }
+			const file = files[ 0 ];
+			this.onDrop( file );
+		}, false );
+	}
+
+	async onDrop( file )
+	{
+		const encoding = await this.encoding( file );
+		this.drop.innerHTML = [ file.name, file.size, file.type, file.lastModifiedDate, encoding || 'UTF-8' ].join( '<br>' );
+		this.text.textContent = await this.readAsText( file, encoding );
+	}
+
+	encoding( file )
+	{
+		return new Promise( ( resolve, reject ) =>
+		{
+			const reader = new FileReader();
+			reader.onerror = reject;
+			reader.onabort = reject;
+			reader.onload = ( event ) => { resolve( reader.result ); };
+			reader.readAsArrayBuffer( file );
+		} ).then( ( buf ) =>
+		{
+			function inChar( char, min = 0x80, max = 0xbf ) { return min <= char && char <= max; }
+			const buffer = new Uint8Array( buf );
+			for ( let i = 0 ; i < buffer.length ; ++i )
+			{
+				const c1 = buffer[ i ];
+				const c2 = buffer[ i + 1 ];
+				const c3 = buffer[ i + 2 ];
+
+				// UTF-8
+				//if ( inChar( char, 0xf0, 0xfd ) ) { return undefined; }
+				if ( inChar( c1, 0xfc, 0xfd ) && inChar( c2 ) && inChar( c3 ) && inChar( buffer[ i + 3 ] ) && inChar( buffer[ i + 4 ] ) && inChar( buffer[ i + 5 ] ) ) { return undefined; }
+				if ( inChar( c1, 0xf8, 0xfb ) && inChar( c2 ) && inChar( c3 ) && inChar( buffer[ i + 3 ] ) && inChar( buffer[ i + 4 ] ) ) { return undefined; }
+				if ( inChar( c1, 0xf0, 0xf7 ) && inChar( c2 ) && inChar( c3 ) && inChar( buffer[ i + 3 ] ) ) { return undefined; }
+
+				if ( inChar( c1, 0x80, 0x9f ) || inChar( c1, 0xa0, 0xc1 ) ) { return 'Shift_JIS'; }
+
+				if ( inChar( c1, 0xe0, 0xef ) && inChar( c2 ) && inChar( c3 ) ) { return undefined; } // Maybe UTF-8
+
+				if ( inChar( c1, 0x00, 0x7e ) ) { continue; } // ASCII
+				++i;
+			}
+			return undefined;
+		} );
+	}
+
+	readAsText( file, encoding )
+	{
+		return new Promise( ( resolve, reject ) =>
+		{
+			const reader = new FileReader();
+			reader.onerror = reject;
+			reader.onabort = reject;
+			reader.onload = ( event ) => { resolve( reader.result ); };
+			reader.readAsText( file, encoding );
+		} );
+	}
+}
+document.addEventListener( 'DOMContentLoaded', () =>
+{
+	new LoadTextFile(
+	{
+		drop: document.getElementById( 'drop' ),
+		text: document.getElementById( 'text' ),
+	} );
+} );
+	</script>
+</head>
+<body>
+	<div id="drop">Drop text file here!</div>
+	<pre id="text"></pre>
+</body>
+</html>
